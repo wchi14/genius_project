@@ -1,0 +1,10 @@
+name: genius_project
+description: Genius Project — modular hub app (Matrix Poker 25 and more).
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dev_dependencies:
+  test: ^1.24.0
