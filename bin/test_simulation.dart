@@ -1,29 +1,94 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:genius_project/core/models/coordinate.dart';
+import 'package:genius_project/games/matrix_poker_25/logic/combo.dart';
 import 'package:genius_project/games/matrix_poker_25/logic/game_loop_manager.dart';
 import 'package:genius_project/games/matrix_poker_25/logic/hand_rank.dart';
+import 'package:genius_project/games/matrix_poker_25/logic/four_cell_line_catalog.dart';
+import 'package:genius_project/games/matrix_poker_25/logic/number_bag.dart';
 import 'package:genius_project/games/matrix_poker_25/logic/player_draft_manager.dart';
 import 'package:genius_project/games/matrix_poker_25/models/matrix_grid_model.dart';
 
-/// CLI sandbox: builds random boards, auto-drafts, runs twelve blind rounds.
+/// Printable **end-to-end** Matrix Poker 25 run:
+/// Phase 1 (25 shared dealer draws → two independent placements),
+/// Phase 2 (12 valid line drafts per player, logged),
+/// Phase 3 (blind duel via [GameLoopManager]).
 void main() {
   final rng = Random();
 
+  stdout.writeln('══════════════════════════════════════════════════════════════');
+  stdout.writeln('  Matrix Poker 25 — full step-by-step simulation (E2E)');
+  stdout.writeln('══════════════════════════════════════════════════════════════');
+
   final gridP1 = MatrixGridModel();
   final gridP2 = MatrixGridModel();
-  fillGridRandom(gridP1, rng);
-  fillGridRandom(gridP2, rng);
 
-  final draftsP1 = autoDraftTwelveCombos(gridP1, rng);
-  final draftsP2 = autoDraftTwelveCombos(gridP2, rng);
+  // ── Phase 1 ───────────────────────────────────────────────────────
+  stdout.writeln('\n▶ PHASE 1 — Board filling');
+  stdout.writeln(
+    '    Rules: each step the dealer draws one integer in 1..10 (shared). '
+    'Each player picks any empty cell on their own 5×5 grid.\n',
+  );
+
+  final dealerBag = NumberBag(rng);
+  for (var step = 1; step <= 25; step++) {
+    final dealer = dealerBag.draw();
+    stdout.writeln('── Step $step/25 — Dealer draws: $dealer ──');
+
+    final p1Cell = pickRandomEmptyCell(gridP1, rng);
+    final placedP1 = gridP1.placeNumber(p1Cell, dealer);
+    if (!placedP1) {
+      throw StateError('P1 placement failed at step $step.');
+    }
+    stdout.writeln(
+      '    P1 places $dealer at ${coordLabel(p1Cell)} '
+      '(reading order index: x=${p1Cell.x}, y=${p1Cell.y}).',
+    );
+
+    final p2Cell = pickRandomEmptyCell(gridP2, rng);
+    final placedP2 = gridP2.placeNumber(p2Cell, dealer);
+    if (!placedP2) {
+      throw StateError('P2 placement failed at step $step.');
+    }
+    stdout.writeln(
+      '    P2 places $dealer at ${coordLabel(p2Cell)} '
+      '(x=${p2Cell.x}, y=${p2Cell.y}).',
+    );
+
+    stdout.writeln('');
+    printGrid('    [ P1 board ]', gridP1);
+    stdout.writeln('');
+    printGrid('    [ P2 board ]', gridP2);
+    stdout.writeln('');
+  }
+
+  if (!gridP1.isFull() || !gridP2.isFull()) {
+    throw StateError('Phase 1 ended but a grid is not full.');
+  }
+
+  // ── Phase 2 ───────────────────────────────────────────────────────
+  stdout.writeln('\n▶ PHASE 2 — Combo drafting (12 lines each)');
+  stdout.writeln(
+    '    Each player selects 12 distinct valid 4-cell adjacent straight lines '
+    'on their own board (simulated: random valid candidates).\n',
+  );
+
+  final draftsP1 = draftTwelveWithLogging(gridP1, rng, 'P1');
+  stdout.writeln('');
+  final draftsP2 = draftTwelveWithLogging(gridP2, rng, 'P2');
+
+  // ── Phase 3 ───────────────────────────────────────────────────────
+  stdout.writeln('\n▶ PHASE 3 — 12-round blind duel');
+  stdout.writeln(
+    '    Both players reveal one unused combo per round; strongest hand wins '
+    '(tie-break: primary key). Commit order is randomized each round.\n',
+  );
 
   final duel = GameLoopManager(
     player1Drafts: draftsP1,
     player2Drafts: draftsP2,
   );
-
-  print('=== Matrix Poker 25 — 12-round duel simulation ===\n');
 
   for (var roundIdx = 0; roundIdx < 12; roundIdx++) {
     final commitOrder = [0, 1]..shuffle(rng);
@@ -40,91 +105,104 @@ void main() {
       );
     }
 
-    print(formatRoundCommentary(resolution));
+    stdout.writeln(formatRoundCommentary(resolution));
   }
 
-  print('');
-  print(formatFinalResult(duel.scorePlayer1, duel.scorePlayer2));
+  stdout.writeln('');
+  stdout.writeln(formatFinalResult(duel.scorePlayer1, duel.scorePlayer2));
+  stdout.writeln('\n══ Simulation complete ══');
 }
 
-/// Writes a random integer `1..10` into every cell (Phase 1 shortcut).
-void fillGridRandom(MatrixGridModel grid, Random rng) {
+// ── Phase 1 helpers ─────────────────────────────────────────────────
+
+/// Chooses a uniformly random empty cell (`value == 0`).
+Coordinate pickRandomEmptyCell(MatrixGridModel grid, Random rng) {
+  final empty = listEmptyCells(grid);
+  if (empty.isEmpty) {
+    throw StateError('No empty cells left.');
+  }
+  return empty[rng.nextInt(empty.length)];
+}
+
+List<Coordinate> listEmptyCells(MatrixGridModel grid) {
+  final out = <Coordinate>[];
   for (var y = 0; y < 5; y++) {
     for (var x = 0; x < 5; x++) {
-      final ok = grid.placeNumber(Coordinate(x, y), 1 + rng.nextInt(10));
-      if (!ok) {
-        throw StateError('Failed to fill cell ($x,$y).');
+      final c = Coordinate(x, y);
+      if (grid.getNumberAt(c) == 0) {
+        out.add(c);
       }
     }
   }
+  return out;
 }
 
-/// Enumerates every distinct valid four-cell adjacent straight segment on a 5×5 board.
-///
-/// Deduplicates segments that appear from multiple start points / directions but
-/// describe the same coordinate set.
-List<List<Coordinate>> allValidFourCellLines() {
-  bool inBounds(Coordinate c) =>
-      c.x >= 0 && c.x <= 4 && c.y >= 0 && c.y <= 4;
+/// Spreadsheet-style cell label: columns A–E, rows 1–5 (top row = 1).
+String coordLabel(Coordinate c) {
+  const letters = 'ABCDE';
+  return '${letters[c.x]}${c.y + 1}';
+}
 
-  const dirs = <(int, int)>[
-    (1, 0),
-    (-1, 0),
-    (0, 1),
-    (0, -1),
-    (1, 1),
-    (1, -1),
-    (-1, 1),
-    (-1, -1),
-  ];
-
-  final seen = <String>{};
-  final lines = <List<Coordinate>>[];
-
-  for (var sx = 0; sx < 5; sx++) {
-    for (var sy = 0; sy < 5; sy++) {
-      for (final d in dirs) {
-        final cells = <Coordinate>[
-          for (var i = 0; i < 4; i++)
-            Coordinate(sx + i * d.$1, sy + i * d.$2),
-        ];
-        if (!cells.every(inBounds)) continue;
-        if (cells.toSet().length != 4) continue;
-
-        final canonical = PlayerDraftManager.readingOrder(cells);
-        final key = canonical.map((e) => '${e.x}:${e.y}').join(',');
-        if (seen.add(key)) {
-          lines.add(canonical);
-        }
-      }
+void printGrid(String title, MatrixGridModel grid) {
+  stdout.writeln(title);
+  const header = '      A  B  C  D  E';
+  stdout.writeln(header);
+  for (var y = 0; y < 5; y++) {
+    final buf = StringBuffer('   ${y + 1} ');
+    for (var x = 0; x < 5; x++) {
+      final v = grid.getNumberAt(Coordinate(x, y));
+      buf.write(v.toString().padLeft(3));
     }
+    stdout.writeln(buf.toString());
   }
-
-  return lines;
 }
 
-/// Attempts to accept up to twelve distinct geometry-valid drafts for [grid].
-///
-/// Shuffles candidate lines so runs produce varied hands while staying legal.
-PlayerDraftManager autoDraftTwelveCombos(MatrixGridModel grid, Random rng) {
+// ── Phase 2 helpers ─────────────────────────────────────────────────
+
+/// Walks shuffled geometry-valid lines until twelve drafts succeed; prints each pick.
+PlayerDraftManager draftTwelveWithLogging(
+  MatrixGridModel grid,
+  Random rng,
+  String playerLabel,
+) {
   final manager = PlayerDraftManager();
   final candidates = allValidFourCellLines()..shuffle(rng);
+  var i = 0;
 
-  for (final line in candidates) {
-    if (manager.draftCount == PlayerDraftManager.maxDrafts) break;
-    manager.tryDraftCombo(grid, line);
-  }
-
-  if (manager.draftCount != PlayerDraftManager.maxDrafts) {
-    throw StateError(
-      'Auto-draft stopped at ${manager.draftCount} combos (need 12).',
-    );
+  for (var draftNum = 1; draftNum <= PlayerDraftManager.maxDrafts; draftNum++) {
+    var accepted = false;
+    while (i < candidates.length) {
+      final line = candidates[i++];
+      if (manager.tryDraftCombo(grid, line)) {
+        final combo = manager.combos.last;
+        stdout.writeln(
+          '  $playerLabel — Draft $draftNum/${PlayerDraftManager.maxDrafts}: '
+          '${formatComboSummary(combo)}',
+        );
+        accepted = true;
+        break;
+      }
+    }
+    if (!accepted) {
+      throw StateError(
+        '$playerLabel: could not place draft #$draftNum '
+        '(exhausted ${candidates.length} candidates).',
+      );
+    }
   }
 
   return manager;
 }
 
-/// Chooses a random combo slot (`0..11`) not yet consumed for [playerIndex].
+String formatComboSummary(Combo c) {
+  final cells = c.coordinates.map(coordLabel).join(' → ');
+  final nums = c.numbers.join(', ');
+  return 'cells $cells | nums [$nums] | ${handRankLabel(c.rank)} '
+      '(primary ${c.primaryKeyValue})';
+}
+
+// ── Phase 3 helpers ─────────────────────────────────────────────────
+
 int pickRandomUnusedComboIndex(
   GameLoopManager duel,
   int playerIndex,

@@ -63,4 +63,13 @@ class MatrixGridModel {
     }
     return true;
   }
+
+  /// Resets every cell to empty (`0`) for a new match.
+  void clear() {
+    for (final row in _cells) {
+      for (var i = 0; i < row.length; i++) {
+        row[i] = _empty;
+      }
+    }
+  }
 }

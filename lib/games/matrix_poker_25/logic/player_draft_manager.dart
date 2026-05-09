@@ -67,6 +67,31 @@ class PlayerDraftManager {
   /// Clears all drafts (e.g. when resetting a training session).
   void clear() => _combos.clear();
 
+  /// Removes the draft at [index] (`0..draftCount-1`) for UI undo.
+  void removeDraftAt(int index) {
+    if (index < 0 || index >= _combos.length) {
+      throw RangeError.index(index, _combos, 'removeDraftAt', null, _combos.length);
+    }
+    _combos.removeAt(index);
+  }
+
+  /// Replaces the current draft list with exactly [maxDrafts] combos (e.g. UI submit).
+  ///
+  /// Used when drafts were assembled elsewhere but must match [GameLoopManager]’s
+  /// expectation of twelve entries.
+  void installDrafts(List<Combo> combos) {
+    if (combos.length != maxDrafts) {
+      throw ArgumentError.value(
+        combos.length,
+        'combos.length',
+        'installDrafts requires exactly $maxDrafts combos',
+      );
+    }
+    _combos
+      ..clear()
+      ..addAll(combos);
+  }
+
   static const int _gridMin = 0;
   static const int _gridMax = 4;
 
