@@ -11,6 +11,7 @@ import 'package:genius_project/games/matrix_poker_25/ai/normal_ai.dart';
 import 'package:genius_project/games/matrix_poker_25/ai/hard_ai.dart';
 import 'package:genius_project/games/matrix_poker_25/ai/matrix_poker_ai_agent.dart';
 
+import 'package:genius_project/core/theme/app_theme.dart';
 import 'board_filling_view.dart';
 import 'drafting_view.dart';
 import 'duel_view.dart';
@@ -30,15 +31,14 @@ class MatrixPokerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Injected cubit: do not reset the session. Fresh cubit: begin Phase 1 after first frame.
-    final child = _MatrixPokerScaffoldBody(
+    final body = _MatrixPokerScaffoldBody(
       autoStartDrafting: cubit == null,
     );
 
     if (cubit != null) {
       return BlocProvider<MatrixPokerCubit>.value(
         value: cubit!,
-        child: child,
+        child: body,
       );
     }
 
@@ -49,7 +49,7 @@ class MatrixPokerScreen extends StatelessWidget {
         playerOneGrid: MatrixGridModel(),
         opponentAgent: _agentForDifficulty(aiDifficulty),
       ),
-      child: child,
+      child: body,
     );
   }
 }
@@ -90,11 +90,28 @@ class _MatrixPokerScaffoldBodyState extends State<_MatrixPokerScaffoldBody> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: BlocBuilder<MatrixPokerCubit, MatrixPokerState>(
-        builder: (context, state) {
-          return state.when(
-            initial: () => const Center(
-              child: CircularProgressIndicator(),
+      appBar: AppBar(
+        title: const Text('Matrix Poker 25'),
+      ),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppTheme.neoBackground,
+              AppTheme.neoBackground.withValues(alpha: 0.92),
+              const Color(0xFF0D1018),
+            ],
+          ),
+        ),
+        child: BlocBuilder<MatrixPokerCubit, MatrixPokerState>(
+          builder: (context, state) {
+            return state.when(
+            initial: () => Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
             boardFilling:
                 (grid, fillRound, dealerValue, remainingSeconds, totalRounds) =>
@@ -115,24 +132,49 @@ class _MatrixPokerScaffoldBodyState extends State<_MatrixPokerScaffoldBody> {
             roundResolved: (_, __, ___, ____) => DuelView(key: _duelViewKey),
             gameOver: (finalP1Score, finalP2Score, winner) => Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(28),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(
+                      Icons.grid_on,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 16),
                     Text(
-                      'Game Over',
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      'Match complete',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: AppTheme.neoTextPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                     const SizedBox(height: 12),
-                    Text('Final score: $finalP1Score – $finalP2Score'),
+                    Text(
+                      'Final score: $finalP1Score – $finalP2Score',
+                      style: const TextStyle(
+                        color: AppTheme.neoTextMuted,
+                        fontSize: 16,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Text(winner),
+                    Text(
+                      winner,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.neoPurple,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           );
-        },
+          },
+        ),
       ),
     );
   }

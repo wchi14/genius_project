@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:genius_project/core/ui/adaptive_layout.dart';
 import 'package:genius_project/core/models/coordinate.dart';
 import 'package:genius_project/games/matrix_poker_25/logic/combo.dart';
 import 'package:genius_project/games/matrix_poker_25/logic/hand_rank.dart';
@@ -190,12 +193,11 @@ class _DraftingViewState extends State<DraftingView> {
           );
         }
 
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
                 Expanded(
                   flex: 3,
                   child: Column(
@@ -203,7 +205,10 @@ class _DraftingViewState extends State<DraftingView> {
                     children: [
                       Text(
                         'Drafted: ${_draftedCombos.length} / ${PlayerDraftManager.maxDrafts}',
-                        style: theme.textTheme.titleMedium,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
@@ -228,7 +233,11 @@ class _DraftingViewState extends State<DraftingView> {
                       Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton(
+                            child: FilledButton.tonal(
+                              style: FilledButton.styleFrom(
+                                foregroundColor: scheme.onSurface,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
                               onPressed: _onAddCombo,
                               child: const Text('Add Combo'),
                             ),
@@ -236,6 +245,11 @@ class _DraftingViewState extends State<DraftingView> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: scheme.onSurface,
+                                side: BorderSide(color: scheme.outline),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
                               onPressed: _selectedCells.isEmpty
                                   ? null
                                   : _clearSelection,
@@ -245,6 +259,15 @@ class _DraftingViewState extends State<DraftingView> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                foregroundColor: scheme.onPrimary,
+                                backgroundColor: scheme.primary,
+                                disabledForegroundColor:
+                                    scheme.onSurface.withValues(alpha: 0.45),
+                                disabledBackgroundColor:
+                                    scheme.surfaceContainerHighest,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
                               onPressed: _draftedCombos.length ==
                                       PlayerDraftManager.maxDrafts
                                   ? _onConfirm
@@ -271,7 +294,6 @@ class _DraftingViewState extends State<DraftingView> {
                 ),
               ],
             ),
-          ),
         );
       },
     );
@@ -319,8 +341,6 @@ class _LabeledGrid extends StatefulWidget {
   final ColorScheme scheme;
   final ThemeData theme;
 
-  static const double _labelSize = 28;
-
   @override
   State<_LabeledGrid> createState() => _LabeledGridState();
 }
@@ -344,134 +364,151 @@ class _LabeledGridState extends State<_LabeledGrid> {
         ? const <Coordinate>{}
         : widget.highlightedCoords!.toSet();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final extent = AdaptiveLayout.gridLabelExtent(
+          math.min(constraints.maxWidth, constraints.maxHeight),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(
-              width: _LabeledGrid._labelSize,
-              height: _LabeledGrid._labelSize,
-              child: SizedBox.shrink(),
-            ),
-            for (var x = 0; x < 5; x++)
-              Expanded(
-                child: Center(
-                  child: Text(
-                    String.fromCharCode('A'.codeUnitAt(0) + x),
-                    style: widget.theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: widget.scheme.primary,
-                    ),
-                  ),
+            Row(
+              children: [
+                SizedBox(
+                  width: extent,
+                  height: extent,
+                  child: const SizedBox.shrink(),
                 ),
-              ),
-          ],
-        ),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: _LabeledGrid._labelSize,
-                child: Column(
-                  children: [
-                    for (var y = 0; y < 5; y++)
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            '${y + 1}',
-                            style: widget.theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: widget.scheme.primary,
-                            ),
-                          ),
+                for (var x = 0; x < 5; x++)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        String.fromCharCode('A'.codeUnitAt(0) + x),
+                        style: widget.theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: widget.scheme.primary,
                         ),
                       ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    void hitTest(Offset local) {
-                      final w = constraints.maxWidth;
-                      final h = constraints.maxHeight;
-                      if (w <= 0 || h <= 0) return;
-                      final x = (local.dx / (w / 5)).floor();
-                      final y = (local.dy / (h / 5)).floor();
-                      if (x < 0 || x > 4 || y < 0 || y > 4) return;
-                      final cell = Coordinate(x, y);
-                      if (_lastDragCell == cell) return;
-                      _lastDragCell = cell;
-                      widget.onCellDragAdd(cell);
-                    }
-
-                    // Use raw pointer listening so taps still go to InkWell.
-                    return Listener(
-                      behavior: HitTestBehavior.translucent,
-                      onPointerDown: (e) {
-                        // Do NOT add on down; this prevents a tap from "adding" and then
-                        // immediately toggling off via InkWell.onTap.
-                        _activePointer = e.pointer;
-                        _lastDragCell = null;
-                        _pointerDownLocal = e.localPosition;
-                        _isDragging = false;
-                      },
-                      onPointerMove: (e) {
-                        if (_activePointer != e.pointer) return;
-                        final down = _pointerDownLocal;
-                        if (down == null) return;
-                        final delta = (e.localPosition - down);
-                        // Only treat as a swipe after a small movement threshold.
-                        // This prevents "tap jitter" on desktop from selecting via swipe
-                        // and then immediately toggling off via InkWell.
-                        if (!_isDragging && delta.distance < 6) {
-                          return;
-                        }
-                        _isDragging = true;
-                        hitTest(e.localPosition);
-                      },
-                      onPointerUp: (_) => _endDrag(),
-                      onPointerCancel: (_) => _endDrag(),
-                      child: Column(
-                        children: [
-                          for (var y = 0; y < 5; y++)
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  for (var x = 0; x < 5; x++)
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(2),
-                                        child: _GridCell(
-                                          coord: Coordinate(x, y),
-                                          value: widget.grid
-                                              .getNumberAt(Coordinate(x, y)),
-                                          selected: widget
-                                              .isSelected(Coordinate(x, y)),
-                                          highlighted: highlightSet
-                                              .contains(Coordinate(x, y)),
-                                          onTap: () => widget
-                                              .onCellTap(Coordinate(x, y)),
-                                          scheme: widget.scheme,
-                                          theme: widget.theme,
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                    ),
+                  ),
+              ],
+            ),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: extent,
+                    child: Column(
+                      children: [
+                        for (var y = 0; y < 5; y++)
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                '${y + 1}',
+                                style: widget.theme.textTheme.titleSmall
+                                    ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: widget.scheme.primary,
+                                ),
                               ),
                             ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, gridConstraints) {
+                        final cellG = AdaptiveLayout.matrixCellGutter(
+                          math.min(
+                            gridConstraints.maxWidth,
+                            gridConstraints.maxHeight,
+                          ),
+                        );
+                        void hitTest(Offset local) {
+                          final w = gridConstraints.maxWidth;
+                          final h = gridConstraints.maxHeight;
+                          if (w <= 0 || h <= 0) return;
+                          final x = (local.dx / (w / 5)).floor();
+                          final y = (local.dy / (h / 5)).floor();
+                          if (x < 0 || x > 4 || y < 0 || y > 4) return;
+                          final cell = Coordinate(x, y);
+                          if (_lastDragCell == cell) return;
+                          _lastDragCell = cell;
+                          widget.onCellDragAdd(cell);
+                        }
+
+                        // Use raw pointer listening so taps still go to InkWell.
+                        return Listener(
+                          behavior: HitTestBehavior.translucent,
+                          onPointerDown: (e) {
+                            // Do NOT add on down; this prevents a tap from "adding" and then
+                            // immediately toggling off via InkWell.onTap.
+                            _activePointer = e.pointer;
+                            _lastDragCell = null;
+                            _pointerDownLocal = e.localPosition;
+                            _isDragging = false;
+                          },
+                          onPointerMove: (e) {
+                            if (_activePointer != e.pointer) return;
+                            final down = _pointerDownLocal;
+                            if (down == null) return;
+                            final delta = (e.localPosition - down);
+                            // Only treat as a swipe after a small movement threshold.
+                            // This prevents "tap jitter" on desktop from selecting via swipe
+                            // and then immediately toggling off via InkWell.
+                            if (!_isDragging && delta.distance < 6) {
+                              return;
+                            }
+                            _isDragging = true;
+                            hitTest(e.localPosition);
+                          },
+                          onPointerUp: (_) => _endDrag(),
+                          onPointerCancel: (_) => _endDrag(),
+                          child: Column(
+                            children: [
+                              for (var y = 0; y < 5; y++)
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      for (var x = 0; x < 5; x++)
+                                        Expanded(
+                                          child: Padding(
+                                            padding: EdgeInsets.all(cellG),
+                                            child: _GridCell(
+                                              coord: Coordinate(x, y),
+                                              value: widget.grid.getNumberAt(
+                                                Coordinate(x, y),
+                                              ),
+                                              selected: widget.isSelected(
+                                                Coordinate(x, y),
+                                              ),
+                                              highlighted: highlightSet
+                                                  .contains(Coordinate(x, y)),
+                                              onTap: () => widget.onCellTap(
+                                                Coordinate(x, y),
+                                              ),
+                                              scheme: widget.scheme,
+                                              theme: widget.theme,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -497,26 +534,34 @@ class _GridCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? scheme.primaryContainer
-          : highlighted
-              ? scheme.tertiaryContainer.withValues(alpha: 0.55)
-              : scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-        onTap: onTap,
-        child: Center(
-          child: Text(
-            '$value',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final u = math.min(constraints.maxWidth, constraints.maxHeight);
+        final r = math.max(u * 0.12, 2.0);
+        return Material(
+          color: selected
+              ? scheme.primaryContainer
+              : highlighted
+                  ? scheme.tertiaryContainer.withValues(alpha: 0.55)
+                  : scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(r),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(r),
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            onTap: onTap,
+            child: Center(
+              child: Text(
+                '$value',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: selected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurface,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -545,7 +590,10 @@ class _DraftListPanel extends StatelessWidget {
       children: [
         Text(
           'Your drafts',
-          style: theme.textTheme.titleMedium,
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: scheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 6),
@@ -560,7 +608,8 @@ class _DraftListPanel extends StatelessWidget {
         Expanded(
           child: DecoratedBox(
             decoration: BoxDecoration(
-              border: Border.all(color: theme.dividerColor),
+              color: scheme.surfaceContainerLow,
+              border: Border.all(color: scheme.outline.withValues(alpha: 0.5)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: combos.isEmpty
@@ -584,8 +633,9 @@ class _DraftListPanel extends StatelessWidget {
 
                       return Material(
                         color: selected
-                            ? scheme.secondaryContainer.withValues(alpha: 0.5)
-                            : scheme.surface,
+                            ? scheme.secondaryContainer
+                                .withValues(alpha: 0.65)
+                            : scheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
@@ -604,17 +654,25 @@ class _DraftListPanel extends StatelessWidget {
                                     '${index + 1}.',
                                     style: theme.textTheme.labelLarge?.copyWith(
                                       color: scheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                                 Expanded(
                                   child: Text(
                                     line,
-                                    style: theme.textTheme.bodyMedium,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: scheme.onSurface,
+                                      height: 1.25,
+                                    ),
                                   ),
                                 ),
                                 if (selected)
                                   TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: scheme.primary,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
                                     onPressed: () => onRemove(index),
                                     icon: const Icon(Icons.delete_outline,
                                         size: 20),

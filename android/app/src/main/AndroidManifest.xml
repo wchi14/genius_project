@@ -3,7 +3,7 @@
         android:label="genius_project"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        <!-- Skia (OpenGL) instead of Impeller — avoids "Width is zero" / dead input on some emulators. -->
+        <!-- Skia on emulators: Impeller can hang or ANR on gphone / virtgpu. -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />

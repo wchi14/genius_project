@@ -1,0 +1,34 @@
+---
+description: Genius Project hub layout, routes, and how to add a mini-game
+alwaysApply: true
+---
+
+# Genius Project — architecture
+
+**Stack:** Flutter (Dart ≥3), `go_router`, `flutter_bloc` (`Cubit`), `freezed` for union-style state where needed.
+
+## Layout
+
+- **`lib/core/`** — shared hub code only: `routing/app_router.dart`, `models/`, `ui/` (mode/game/difficulty selection).
+- **`lib/games/<game_id>/`** — one folder per mini-game (for example `matrix_poker_25`, `blind_bluff_fatal_fold`). Typical subfolders:
+  - **`logic/`** — cubits, pure game rules, loop managers.
+  - **`models/`** — data types used by logic/UI.
+  - **`ui/`** — game-specific widgets and the route-facing screen.
+  - **`ai/`** — opponents / agents when applicable.
+
+Keep hub screens thin; game rules stay inside `lib/games/<game_id>/`.
+
+## Routing contract
+
+- Hub routes live in `lib/core/routing/app_router.dart`.
+- **`gameId`** is **snake_case** and matches the folder under `lib/games/` (e.g. `matrix_poker_25`).
+- Flow: `/` → `/games` → `/games/:gameId/difficulty` → `/play/:gameId/:difficulty`.
+- Register a new game by:
+  1. Adding navigation from `GameSelectionScreen` (path uses same `gameId`).
+  2. Handling `gameId` in the `/play/:gameId/:difficulty` `switch` with that game’s root widget.
+
+## Tooling / codegen
+
+- Analyzer: `flutter analyze` (uses `package:flutter_lints`).
+- After editing `@freezed` types: `dart run build_runner build --delete-conflicting-outputs`.
+- **`bin/`** — optional Dart CLIs (`dart run bin/<script>.dart`).

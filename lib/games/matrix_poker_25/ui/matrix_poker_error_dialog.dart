@@ -2,13 +2,14 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Full-screen blur + elevated card for drafting / gameplay errors (replaces SnackBar).
+import 'package:genius_project/core/theme/app_theme.dart';
+
+/// Custom modal: dark surface, blur behind gameplay, explicit close control.
 Future<void> showMatrixPokerErrorDialog(
   BuildContext context, {
   required String message,
   String title = 'Heads up',
 }) {
-  final theme = Theme.of(context);
   final localizations = MaterialLocalizations.of(context);
 
   return showGeneralDialog<void>(
@@ -27,9 +28,9 @@ Future<void> showMatrixPokerErrorDialog(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.of(dialogContext).pop(),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                   child: ColoredBox(
-                    color: theme.colorScheme.shadow.withValues(alpha: 0.45),
+                    color: Colors.black.withValues(alpha: 0.55),
                   ),
                 ),
               ),
@@ -47,42 +48,64 @@ Future<void> showMatrixPokerErrorDialog(
                     constraints: const BoxConstraints(maxWidth: 420),
                     child: Material(
                       elevation: 28,
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(20),
                       clipBehavior: Clip.antiAlias,
-                      color: theme.colorScheme.surfaceContainerHigh,
+                      color: const Color(0xFF1A2234),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 26,
-                        ),
+                        padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              size: 58,
-                              color: theme.colorScheme.tertiary,
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 28,
+                                  color: AppTheme.neoGold,
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  tooltip: 'Close',
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(),
+                                  icon: const Icon(Icons.close),
+                                  color: AppTheme.neoTextPrimary,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: Colors.white12,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 8),
                             Text(
                               title,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
+                              style: const TextStyle(
+                                color: AppTheme.neoTextPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 12),
                             Text(
                               message,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                height: 1.35,
-                                color: theme.colorScheme.onSurfaceVariant,
+                              style: const TextStyle(
+                                color: AppTheme.neoTextMuted,
+                                fontSize: 15,
+                                height: 1.4,
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 28),
-                            FilledButton.tonal(
-                              onPressed: () => Navigator.of(dialogContext).pop(),
+                            const SizedBox(height: 24),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.neoPurple,
+                                foregroundColor: AppTheme.neoTextPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
                               child: const Text('OK'),
                             ),
                           ],

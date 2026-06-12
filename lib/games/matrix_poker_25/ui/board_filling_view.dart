@@ -54,12 +54,11 @@ class BoardFillingView extends StatelessWidget {
     final scheme = theme.colorScheme;
     final timeLeft = _formatMmSs(remainingSeconds);
     final isUrgent = remainingSeconds <= 10;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
             Expanded(
               flex: 2,
               child: Column(
@@ -128,12 +127,29 @@ class BoardFillingView extends StatelessWidget {
               flex: 5,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: scheme.outlineVariant),
-                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: scheme.primary.withValues(alpha: 0.55),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: 0.12),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      scheme.surfaceContainerLow,
+                      scheme.surface.withValues(alpha: 0.92),
+                    ],
+                  ),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(16),
                   child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: Column(
@@ -169,7 +185,6 @@ class BoardFillingView extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -213,8 +228,10 @@ class _Phase1Cell extends StatelessWidget {
 
     if (empty) {
       return Material(
-        color: scheme.secondaryContainer.withValues(alpha: 0.4),
+        color: scheme.secondaryContainer.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(10),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           overlayColor: const WidgetStatePropertyAll(Colors.transparent),
@@ -226,6 +243,8 @@ class _Phase1Cell extends StatelessWidget {
 
     return Material(
       color: scheme.surfaceContainerHighest,
+      elevation: 1,
+      shadowColor: Colors.black54,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),

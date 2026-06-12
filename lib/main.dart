@@ -1,18 +1,39 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:genius_project/core/bootstrap/app_orientation_lock.dart';
 import 'package:genius_project/core/routing/app_router.dart';
+import 'package:genius_project/core/services/audio_haptic_manager.dart';
+import 'package:genius_project/core/services/audio_haptic_service.dart';
+import 'package:genius_project/core/theme/app_theme.dart';
 
-/// Entry point stays synchronous so the first frame is not delayed behind
-/// [SystemChrome] work — that ordering can race the Android surface and produce
-/// `FlutterRenderer: Width is zero` on some emulators (no hits, no Dart logs).
-/// Landscape is enforced by `android:screenOrientation` in AndroidManifest.
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    MaterialApp.router(
+  await AppOrientationLock.apply();
+  // BGM + structured SFX + haptic tracks — must be awaited so the BGM player
+  // has ReleaseMode.loop set before any screen calls playLobbyBGM().
+  await AudioHapticService.instance.initialize();
+  // ASMR game clips (card flip, dice shake…) — fire-and-forget; files may not
+  // exist until added, and missing files are skipped gracefully.
+  unawaited(AudioHapticManager.instance.preloadCommonAssets());
+  runApp(GeniusApp(router: createAppRouter()));
+}
+
+class GeniusApp extends StatelessWidget {
+  const GeniusApp({required this.router, super.key});
+
+  final GoRouter router;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
       title: 'Genius Project',
-      debugShowCheckedModeBanner: true,
-      routerConfig: appRouter,
-    ),
-  );
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.neoCasinoDark(),
+      themeMode: ThemeMode.dark,
+      routerConfig: router,
+    );
+  }
 }

@@ -1,5 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
+import 'package:genius_project/core/theme/app_theme.dart';
+import 'package:genius_project/core/ui/adaptive_layout.dart';
 import 'package:genius_project/core/models/coordinate.dart';
 import 'package:genius_project/games/matrix_poker_25/models/matrix_grid_model.dart';
 
@@ -24,32 +28,35 @@ class MatrixPokerGrid extends StatelessWidget {
         ? const <Coordinate>{}
         : highlightCoords!.toSet();
 
-    // IMPORTANT: avoid GridView here. Even with NeverScrollablePhysics, a GridView
-    // can end up clipped in tight layouts (showing only a few rows) because it's
-    // still a scroll viewport. This Expanded Row/Column layout always paints all
-    // 25 cells and scales to whatever space the parent gives it.
-    return Column(
-      children: [
-        for (var y = 0; y < 5; y++)
-          Expanded(
-            child: Row(
-              children: [
-                for (var x = 0; x < 5; x++)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(3),
-                      child: _GridCell(
-                        value: grid.getNumberAt(Coordinate(x, y)),
-                        highlight: highlightSet.contains(Coordinate(x, y)),
-                        theme: theme,
-                        scheme: scheme,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final g = AdaptiveLayout.matrixCellGutter(
+          math.min(constraints.maxWidth, constraints.maxHeight),
+        );
+        return Column(
+          children: [
+            for (var y = 0; y < 5; y++)
+              Expanded(
+                child: Row(
+                  children: [
+                    for (var x = 0; x < 5; x++)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.all(g),
+                          child: _GridCell(
+                            value: grid.getNumberAt(Coordinate(x, y)),
+                            highlight: highlightSet.contains(Coordinate(x, y)),
+                            theme: theme,
+                            scheme: scheme,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-      ],
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -69,37 +76,68 @@ class _GridCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(8),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Center(
-            child: Text(
-              '$value',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: scheme.onSurface,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final u = math.min(constraints.maxWidth, constraints.maxHeight);
+        final r = math.max(u * 0.08, 1.0);
+        final shadowAlpha = highlight ? 0.42 : 0.22;
+        final lift = u * (highlight ? 0.06 : 0.04);
+        final ringBlur = highlight ? u * 0.12 : 0.0;
+        final ringSpread = highlight ? u * 0.008 : 0.0;
+        final ringW = math.max(u * 0.035, 1.0);
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: shadowAlpha),
+                blurRadius: lift,
+                offset: Offset(0, lift * 0.35),
               ),
-            ),
+              BoxShadow(
+                color: AppTheme.neoPurple
+                    .withValues(alpha: highlight ? 0.2 : 0.0),
+                blurRadius: ringBlur,
+                spreadRadius: ringSpread,
+              ),
+            ],
           ),
-          if (highlight)
-            IgnorePointer(
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: scheme.tertiary,
-                      width: 3,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(r),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: Text(
+                    '$value',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ),
+                if (highlight)
+                  IgnorePointer(
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppTheme.neoPurple,
+                            width: ringW,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:genius_project/core/theme/app_theme.dart';
+import 'package:genius_project/core/ui/adaptive_layout.dart';
 import 'package:genius_project/core/models/coordinate.dart';
 import 'package:genius_project/games/matrix_poker_25/logic/combo.dart';
 import 'package:genius_project/games/matrix_poker_25/logic/game_loop_manager.dart';
@@ -21,21 +23,15 @@ class DuelView extends StatefulWidget {
   State<DuelView> createState() => _DuelViewState();
 }
 
-class _DuelViewState extends State<DuelView>
-    with SingleTickerProviderStateMixin {
+class _DuelViewState extends State<DuelView> {
   int? _focusedComboIndex;
   Timer? _advanceTimer;
   int? _scheduledAutoAdvanceRound;
-
-  late final AnimationController _revealController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 450),
-  );
+  int? _roundResultDialogShownForRound;
 
   @override
   void dispose() {
     _advanceTimer?.cancel();
-    _revealController.dispose();
     super.dispose();
   }
 
@@ -61,6 +57,14 @@ class _DuelViewState extends State<DuelView>
         orElse: () => false,
       );
       if (!stillResolved) {
+        return;
+      }
+      if (mounted &&
+          _roundResultDialogShownForRound == roundNumber &&
+          Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      if (!mounted) {
         return;
       }
       cubit.advanceAfterRoundResolved();
@@ -99,6 +103,37 @@ class _DuelViewState extends State<DuelView>
     return cubit.playerOneDrafts.combos[i].coordinates;
   }
 
+  void _presentRoundResultDialog(
+    BuildContext context,
+    RoundResolution resolution,
+    String summaryLine,
+  ) {
+    if (_roundResultDialogShownForRound == resolution.roundNumber) {
+      return;
+    }
+    _roundResultDialogShownForRound = resolution.roundNumber;
+    final cubit = context.read<MatrixPokerCubit>();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return _RoundResultDialog(
+          resolution: resolution,
+          summaryLine: summaryLine,
+          onContinue: () {
+            Navigator.of(dialogCtx).pop();
+            _cancelAutoAdvance();
+            cubit.advanceAfterRoundResolved();
+          },
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() => _roundResultDialogShownForRound = null);
+      }
+    });
+  }
+
   Widget _duelScaffold(
     BuildContext context, {
     required MatrixPokerCubit cubit,
@@ -107,8 +142,6 @@ class _DuelViewState extends State<DuelView>
     required int scoreP2,
     required bool waiting,
     required bool combosEnabled,
-    required RoundResolution? resolved,
-    required String? resultMessage,
     required int? remainingSeconds,
   }) {
     final grid = cubit.playerOneGrid;
@@ -118,13 +151,13 @@ class _DuelViewState extends State<DuelView>
     final timeLabel =
         remainingSeconds == null ? null : 'Time: $remainingSeconds seconds';
 
-    return SafeArea(
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: Padding(
+            padding: AdaptiveLayout.screenPadding(context),
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
@@ -139,7 +172,7 @@ class _DuelViewState extends State<DuelView>
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   if (timeLabel != null) ...[
-                    const SizedBox(height: 6),
+                    SizedBox(height: AdaptiveLayout.sectionGap(context) * 0.3),
                     Text(
                       timeLabel,
                       textAlign: TextAlign.center,
@@ -150,11 +183,14 @@ class _DuelViewState extends State<DuelView>
                           ),
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  SizedBox(height: AdaptiveLayout.sectionGap(context) * 0.55),
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final wide = constraints.maxWidth >= 560;
+                        final wide = AdaptiveLayout.duelWideLayout(
+                          constraints.maxWidth,
+                          context,
+                        );
                         final gridSection = AspectRatio(
                           aspectRatio: 1,
                           child: MatrixPokerGrid(
@@ -175,7 +211,8 @@ class _DuelViewState extends State<DuelView>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(flex: 11, child: gridSection),
-                              const SizedBox(width: 12),
+                              SizedBox(
+                                  width: AdaptiveLayout.inlineGap(context)),
                               Expanded(flex: 9, child: listSection),
                             ],
                           );
@@ -187,7 +224,8 @@ class _DuelViewState extends State<DuelView>
                               width: constraints.maxWidth,
                               child: gridSection,
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(
+                                height: AdaptiveLayout.sectionGap(context)),
                             Expanded(child: listSection),
                           ],
                         );
@@ -202,20 +240,7 @@ class _DuelViewState extends State<DuelView>
             const Positioned.fill(
               child: _WaitingOverlay(),
             ),
-          if (resolved != null && resultMessage != null)
-            Positioned.fill(
-              child: _RoundRevealOverlay(
-                resolution: resolved,
-                summaryLine: resultMessage,
-                animation: _revealController,
-                onContinue: () {
-                  _cancelAutoAdvance();
-                  context.read<MatrixPokerCubit>().advanceAfterRoundResolved();
-                },
-              ),
-            ),
         ],
-      ),
     );
   }
 
@@ -234,17 +259,21 @@ class _DuelViewState extends State<DuelView>
           waitingForOpponent: () {
             setState(() => _focusedComboIndex = null);
           },
-          roundResolved: (_, __, ___, ____) {
+          roundResolved: (_, __, message, ___) {
             setState(() => _focusedComboIndex = null);
-            _revealController.forward(from: 0);
             final res = context.read<MatrixPokerCubit>().latestRoundResolution;
             if (res != null) {
               _scheduleAutoAdvance(context, res.roundNumber);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) {
+                  return;
+                }
+                _presentRoundResultDialog(context, res, message);
+              });
             }
           },
           duelTurn: (_, __, ___, ____, _____) {
             _cancelAutoAdvance();
-            _revealController.reset();
           },
           gameOver: (_, __, ___) {
             _cancelAutoAdvance();
@@ -265,8 +294,6 @@ class _DuelViewState extends State<DuelView>
             scoreP2: p2Score,
             waiting: false,
             combosEnabled: true,
-            resolved: null,
-            resultMessage: null,
             remainingSeconds: remainingSeconds,
           ),
           waitingForOpponent: () {
@@ -279,12 +306,10 @@ class _DuelViewState extends State<DuelView>
               scoreP2: h.p2Score,
               waiting: true,
               combosEnabled: false,
-              resolved: null,
-              resultMessage: null,
               remainingSeconds: null,
             );
           },
-          roundResolved: (_, __, message, ___) {
+          roundResolved: (p1Combo, p2Combo, msg, isGameOver) {
             final res = cubit.latestRoundResolution;
             if (res == null) {
               return const SizedBox.shrink();
@@ -297,8 +322,6 @@ class _DuelViewState extends State<DuelView>
               scoreP2: res.scorePlayer2After,
               waiting: false,
               combosEnabled: false,
-              resolved: res,
-              resultMessage: message,
               remainingSeconds: null,
             );
           },
@@ -328,13 +351,14 @@ class _ComboList extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final pad = AdaptiveLayout.inlineGap(context) * 1.1;
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: theme.dividerColor),
         borderRadius: BorderRadius.circular(12),
       ),
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        padding: EdgeInsets.all(pad),
         itemCount: combos.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
@@ -355,12 +379,14 @@ class _ComboList extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               onTap: used || !enabled ? null : () => onTap(index),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AdaptiveLayout.sectionGap(context),
+                  vertical: AdaptiveLayout.sectionGap(context) * 0.55,
+                ),
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 28,
+                      width: AdaptiveLayout.shortestSide(context) * 0.07,
                       child: Text(
                         '#${index + 1}',
                         style: theme.textTheme.labelLarge?.copyWith(
@@ -423,87 +449,127 @@ class _WaitingOverlay extends StatelessWidget {
   }
 }
 
-class _RoundRevealOverlay extends StatelessWidget {
-  const _RoundRevealOverlay({
+class _RoundResultDialog extends StatelessWidget {
+  const _RoundResultDialog({
     required this.resolution,
     required this.summaryLine,
-    required this.animation,
     required this.onContinue,
   });
 
   final RoundResolution resolution;
   final String summaryLine;
-  final AnimationController animation;
   final VoidCallback onContinue;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final p1 = _comboSummary(resolution.player1Combo);
     final p2 = _comboSummary(resolution.player2Combo);
     final outcome = _winnerLine(resolution.winner);
+    final bodyStyle = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurface,
+      height: 1.25,
+    );
+    final titleStyle = theme.textTheme.labelLarge?.copyWith(
+      color: scheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
 
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.55),
-        ),
-        child: Center(
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.92, end: 1).animate(
-              CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutBack,
+    return Dialog(
+      backgroundColor: scheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: AdaptiveLayout.dialogInsets(context),
+      child: Padding(
+        padding: AdaptiveLayout.panelPadding(context),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Round ${resolution.roundNumber} result',
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w700,
               ),
+              textAlign: TextAlign.center,
             ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Card(
-                margin: const EdgeInsets.all(24),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+            SizedBox(height: AdaptiveLayout.sectionGap(context) * 0.75),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Round ${resolution.roundNumber} result',
-                        style: theme.textTheme.titleLarge,
+                        'Player 1',
+                        style: titleStyle,
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 16),
-                      Text('P1: $p1', style: theme.textTheme.bodyLarge),
-                      const SizedBox(height: 8),
-                      Text('P2: $p2', style: theme.textTheme.bodyLarge),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AdaptiveLayout.inlineGap(context)),
                       Text(
-                        outcome,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        p1,
+                        style: bodyStyle,
                         textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        summaryLine,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        onPressed: onContinue,
-                        child: const Text('Continue'),
                       ),
                     ],
                   ),
                 ),
+                SizedBox(width: AdaptiveLayout.inlineGap(context)),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Player 2',
+                        style: titleStyle,
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: AdaptiveLayout.inlineGap(context)),
+                      Text(
+                        p2,
+                        style: bodyStyle,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: AdaptiveLayout.sectionGap(context) * 0.65),
+            Text(
+              outcome,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: AppTheme.neoPurple,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: AdaptiveLayout.inlineGap(context)),
+            Text(
+              summaryLine,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+                height: 1.3,
               ),
             ),
-          ),
+            SizedBox(height: AdaptiveLayout.sectionGap(context) * 0.85),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.neoGold,
+                foregroundColor: AppTheme.neoBackground,
+                padding: EdgeInsets.symmetric(
+                  vertical: AdaptiveLayout.inlineGap(context),
+                ),
+              ),
+              onPressed: onContinue,
+              child: const Text('Continue'),
+            ),
+          ],
         ),
       ),
     );

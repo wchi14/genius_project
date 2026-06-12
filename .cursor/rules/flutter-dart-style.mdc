@@ -1,0 +1,33 @@
+---
+description: Dart/Flutter conventions used in genius_project
+globs: lib/**/*.dart
+alwaysApply: false
+---
+
+# Dart / Flutter style (this repo)
+
+## Imports
+
+- Prefer **`package:genius_project/...`** for imports that cross `lib/` subtrees (clear and stable refactors).
+- Relative imports (`../`) are fine **within** the same feature area (e.g. `core/ui` → `core/models`).
+
+## State and UI
+
+- Use **`Cubit<State>`** + **`emit`** for game/session presenters (`flutter_bloc`).
+- Prefer **`@freezed` unions** for multi-phase game UI state; implement exhaustive **`state.when`** / **`maybeWhen`** in `BlocBuilder` builders.
+- Wire games with **`BlocProvider`** / **`BlocProvider.value`** (support injected cubits for tests).
+- Use **`const`** constructors and widgets where possible; **`Theme.of(context).textTheme`** for hub headings/button spacing patterns already in selection screens.
+
+## Types and visibility
+
+- Simple enums (e.g. difficulty): plain **`enum`** with **`Enum.name`** in URLs.
+- Private implementation widgets/helpers: **leading `_`** on classes/functions intended file-private.
+
+## Docs and async
+
+- Use **`///`** for public APIs and non-obvious lifecycle (e.g. cubit phase timers, mock latency).
+- Prefer **`unawaited(...)`** when intentionally firing async side work from synchronous cubit methods (see existing cubit patterns).
+
+## Lint / hygiene
+
+- Follow **`analysis_options.yaml`** (`flutter_lints`). Fix analyzer issues in touched files; avoid unrelated refactors.
